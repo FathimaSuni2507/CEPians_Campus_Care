@@ -15,7 +15,7 @@ app.get('/', (req, res) => {
 });
 
 // 1. MongoDB Atlas Connection
-const MONGO_URI = "mongodb+srv://fathimasuni25_db_user:Xg84eUcvKK4hAHtR@cluster0.9yeaire.mongodb.net/cep_unihub?retryWrites=true&w=majority";
+const MONGO_URI = process.env.MONGO_URI;
 
 mongoose.connect(MONGO_URI)
     .then(() => console.log("Connected to MongoDB Atlas for CEP Campus Care 🚀"))
