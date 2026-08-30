@@ -21,6 +21,16 @@ mongoose.connect(MONGO_URI)
     .then(() => console.log('✅ Connected to CEP MongoDB Database successfully!'))
     .catch((err) => console.error('❌ MongoDB Connection Error:', err));
 
+// ================= HELPER FUNCTIONS =================
+
+// Attractive CEP-themed Badges and Titles based on Karma Points
+function getBadge(points) {
+    if (points >= 200) return { title: 'CEP Legend 🌟', level: 'Legend' };
+    if (points >= 100) return { title: 'CEP Champion 🏆', level: 'Champion' };
+    if (points >= 50)  return { title: 'CEP Helper 🤝', level: 'Helper' };
+    return { title: 'CEpian Contributor 🌱', level: 'Contributor' };
+}
+
 // ================= SCHEMAS & MODELS =================
 
 const ItemSchema = new mongoose.Schema({
@@ -66,7 +76,7 @@ app.get('/api/items', async (req, res) => {
     }
 });
 
-// 2. Post a new item/request
+// 2. Post a new item/request (No karma points given on posting)
 app.post('/api/items', async (req, res) => {
     try {
         const itemData = req.body;
@@ -77,41 +87,58 @@ app.post('/api/items', async (req, res) => {
         const newItem = new Item(itemData);
         await newItem.save();
 
-        let earnedKarma = 0;
-        if (newItem.rollNo) {
-            let user = await User.findOne({ rollNo: newItem.rollNo });
-            if (!user) {
-                user = new User({ rollNo: newItem.rollNo, karmaPoints: 10 });
-            } else {
-                user.karmaPoints += 10;
-            }
-            await user.save();
-            earnedKarma = 10;
-        }
-
-        res.status(201).json({ item: newItem, earnedKarma });
+        res.status(201).json({ item: newItem, earnedKarma: 0 });
     } catch (err) {
         console.error("Error creating item:", err);
         res.status(500).json({ error: "Failed to save post. Please try again." });
     }
 });
 
-// 3. Get Karma Points for a specific user
+// 3. Get Karma Points & Badge details for a specific user
 app.get('/api/users/:rollNo/karma', async (req, res) => {
     try {
         const formattedRoll = req.params.rollNo.toUpperCase();
         const user = await User.findOne({ rollNo: formattedRoll });
-        res.json({ karmaPoints: user ? user.karmaPoints : 0 });
+        const points = user ? user.karmaPoints : 0;
+        const badge = getBadge(points);
+
+        res.json({ 
+            rollNo: formattedRoll,
+            karmaPoints: points, 
+            badge: badge.title,
+            level: badge.level
+        });
     } catch (err) {
         console.error("Karma fetch error:", err);
         res.status(500).json({ error: "Failed to fetch karma points" });
     }
 });
 
-// 4. Claim item using passcode
+// 4. Karma Leaderboard (Top CEP Champions)
+app.get('/api/leaderboard', async (req, res) => {
+    try {
+        const topUsers = await User.find({ karmaPoints: { $gt: 0 } })
+            .sort({ karmaPoints: -1 })
+            .limit(10);
+
+        const leaderboard = topUsers.map((user, index) => ({
+            rank: index + 1,
+            rollNo: user.rollNo,
+            karmaPoints: user.karmaPoints,
+            badge: getBadge(user.karmaPoints).title
+        }));
+
+        res.json(leaderboard);
+    } catch (err) {
+        console.error("Leaderboard error:", err);
+        res.status(500).json({ error: "Failed to fetch leaderboard" });
+    }
+});
+
+// 5. Claim item using passcode (Handover completed -> 3 Points added ONLY for Found / Offer)
 app.post('/api/items/:id/claim', async (req, res) => {
     try {
-        const { passcode, claimedByRollNo } = req.body;
+        const { passcode } = req.body;
         const item = await Item.findById(req.params.id);
 
         if (!item) return res.status(404).json({ error: "Item not found" });
@@ -120,18 +147,36 @@ app.post('/api/items/:id/claim', async (req, res) => {
             item.isResolved = true;
             await item.save();
 
-            if (claimedByRollNo) {
-                const formattedRoll = claimedByRollNo.toUpperCase();
-                let user = await User.findOne({ rollNo: formattedRoll });
+            let earnedKarma = 0;
+            let currentPoints = 0;
+            let currentBadge = getBadge(0).title;
+
+            // Karma points are awarded ONLY if the post was an "Offer" or "Found"
+            const isHelperType = item.intent === 'Offer' || item.type === 'Found';
+
+            if (isHelperType && item.rollNo) {
+                const helperRoll = item.rollNo.toUpperCase();
+                let user = await User.findOne({ rollNo: helperRoll });
+
+                earnedKarma = 3; // 3 Points per successful handover
+
                 if (!user) {
-                    user = new User({ rollNo: formattedRoll, karmaPoints: 10 });
+                    user = new User({ rollNo: helperRoll, karmaPoints: earnedKarma });
                 } else {
-                    user.karmaPoints += 10;
+                    user.karmaPoints += earnedKarma;
                 }
                 await user.save();
+
+                currentPoints = user.karmaPoints;
+                currentBadge = getBadge(currentPoints).title;
             }
 
-            res.json({ message: "Handover verified successfully!" });
+            res.json({ 
+                message: "Handover verified successfully!",
+                earnedKarma: earnedKarma,
+                totalKarma: currentPoints,
+                badge: currentBadge
+            });
         } else {
             res.status(400).json({ error: "Incorrect passcode entered!" });
         }
@@ -141,7 +186,7 @@ app.post('/api/items/:id/claim', async (req, res) => {
     }
 });
 
-// 5. Report fake or spam post
+// 6. Report fake or spam post
 app.post('/api/items/:id/report', async (req, res) => {
     try {
         const { userRollNo } = req.body;
@@ -167,7 +212,7 @@ app.post('/api/items/:id/report', async (req, res) => {
     }
 });
 
-// 6. Mark post as resolved
+// 7. Mark post as resolved
 app.patch('/api/items/:id/resolve', async (req, res) => {
     try {
         const { rollNo } = req.body;
@@ -188,7 +233,7 @@ app.patch('/api/items/:id/resolve', async (req, res) => {
     }
 });
 
-// 7. Delete post permanently
+// 8. Delete post permanently
 app.delete('/api/items/:id', async (req, res) => {
     try {
         const { rollNo } = req.body;
