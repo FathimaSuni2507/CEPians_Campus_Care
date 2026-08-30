@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 const app = express();
@@ -10,7 +11,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Serve Static Files (HTML, CSS, JS, Assets)
+// Serve Static Files
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.static(__dirname));
 
@@ -21,9 +22,57 @@ mongoose.connect(MONGO_URI)
     .then(() => console.log('✅ Connected to CEP MongoDB Database successfully!'))
     .catch((err) => console.error('❌ MongoDB Connection Error:', err));
 
+// ================= NODEMAILER EMAIL TRANSPORTER =================
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER || 'yourgmail@gmail.com', // Render Env variable
+        pass: process.env.EMAIL_PASS || 'your-app-password'   // Gmail App Password
+    }
+});
+
+// Helper to send email notification
+async function sendMatchEmail(toEmail, userPost, matchedPost) {
+    if (!process.env.EMAIL_USER || process.env.EMAIL_USER === 'yourgmail@gmail.com') {
+        console.log("⚠️ Email credentials not set in Environment Variables. Skipping email send.");
+        return;
+    }
+
+    const mailOptions = {
+        from: `"CEPians Campus Care" <${process.env.EMAIL_USER}>`,
+        to: toEmail,
+        subject: `🔔 Potential Match Found for your CEP Listing: ${userPost.title}`,
+        html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #e0e0e0; rounded: 10px;">
+                <h2 style="color: #0d6efd;">CEPians Campus Care Alert!</h2>
+                <p>Hello <strong>${userPost.postedBy}</strong>,</p>
+                <p>We found a potential match on the campus feed for your recent post: <strong>"${userPost.title}"</strong>.</p>
+                <hr/>
+                <h3>Matched Item Details:</h3>
+                <ul>
+                    <li><strong>Item:</strong> ${matchedPost.title}</li>
+                    <li><strong>Category:</strong> ${matchedPost.type} (${matchedPost.intent})</li>
+                    <li><strong>Location:</strong> ${matchedPost.location}</li>
+                    <li><strong>Posted By:</strong> ${matchedPost.postedBy}</li>
+                    <li><strong>Contact Email:</strong> <a href="mailto:${matchedPost.email}">${matchedPost.email}</a></li>
+                </ul>
+                <p>Please connect with them to verify if this is your item/resource.</p>
+                <br>
+                <p style="font-size: 12px; color: #777;">College of Engineering Perumon - Student Support Portal</p>
+            </div>
+        `
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log(`📧 Match Notification Email sent successfully to ${toEmail}`);
+    } catch (error) {
+        console.error("❌ Email Sending Error:", error);
+    }
+}
+
 // ================= HELPER FUNCTIONS =================
 
-// Attractive CEP-themed Badges and Titles based on Karma Points
 function getBadge(points) {
     if (points >= 200) return { title: 'CEP Legend 🌟', level: 'Legend' };
     if (points >= 100) return { title: 'CEP Champion 🏆', level: 'Champion' };
@@ -34,8 +83,8 @@ function getBadge(points) {
 // ================= SCHEMAS & MODELS =================
 
 const ItemSchema = new mongoose.Schema({
-    type: { type: String, required: true },         // Lost, Found, Resource, Skill
-    intent: { type: String, required: true },       // Request, Offer
+    type: { type: String, required: true },
+    intent: { type: String, required: true },
     title: { type: String, required: true },
     brand: { type: String, default: '' },
     color: { type: String, default: '' },
@@ -65,7 +114,7 @@ const User = mongoose.model('User', UserSchema);
 
 // ================= API ROUTES =================
 
-// 1. Get all active (unresolved) listings
+// 1. Get all active listings
 app.get('/api/items', async (req, res) => {
     try {
         const items = await Item.find({ isResolved: { $ne: true } }).sort({ createdAt: -1 });
@@ -76,7 +125,7 @@ app.get('/api/items', async (req, res) => {
     }
 });
 
-// 2. Post a new item/request (No karma points given on posting)
+// 2. Post a new item/request
 app.post('/api/items', async (req, res) => {
     try {
         const itemData = req.body;
@@ -94,7 +143,48 @@ app.post('/api/items', async (req, res) => {
     }
 });
 
-// 3. Get Karma Points & Badge details for a specific user
+// 3. AUTO MATCH FINDER ROUTE + EMAIL NOTIFICATION
+app.get('/api/items/:id/matches', async (req, res) => {
+    try {
+        const currentItem = await Item.findById(req.params.id);
+        if (!currentItem) return res.status(404).json({ error: "Item not found" });
+
+        // Opposite search: Lost <-> Found, Request <-> Offer
+        const targetType = currentItem.type === 'Lost' ? 'Found' : (currentItem.type === 'Found' ? 'Lost' : currentItem.type);
+        const targetIntent = currentItem.intent === 'Request' ? 'Offer' : 'Request';
+
+        // Match based on title keywords (Case Insensitive)
+        const cleanTitle = currentItem.title.replace(/[^a-zA-Z0-9 ]/g, "").trim();
+        const keywords = cleanTitle.split(" ").filter(w => w.length > 2);
+        
+        const searchRegex = keywords.length > 0 ? keywords.join("|") : cleanTitle;
+
+        const matches = await Item.find({
+            _id: { $ne: currentItem._id },
+            isResolved: { $ne: true },
+            $or: [
+                { type: targetType },
+                { intent: targetIntent }
+            ],
+            title: { $regex: searchRegex, $options: 'i' }
+        }).limit(3);
+
+        if (matches.length > 0) {
+            // Trigger background Email Notification
+            sendMatchEmail(currentItem.email, currentItem, matches[0]);
+        }
+
+        res.json({
+            matchesCount: matches.length,
+            matches: matches
+        });
+    } catch (err) {
+        console.error("Auto match error:", err);
+        res.status(500).json({ error: "Failed to search matches" });
+    }
+});
+
+// 4. Get Karma Points & Badge details for a specific user
 app.get('/api/users/:rollNo/karma', async (req, res) => {
     try {
         const formattedRoll = req.params.rollNo.toUpperCase();
@@ -114,7 +204,7 @@ app.get('/api/users/:rollNo/karma', async (req, res) => {
     }
 });
 
-// 4. Karma Leaderboard (Top CEP Champions)
+// 5. Karma Leaderboard
 app.get('/api/leaderboard', async (req, res) => {
     try {
         const topUsers = await User.find({ karmaPoints: { $gt: 0 } })
@@ -135,7 +225,7 @@ app.get('/api/leaderboard', async (req, res) => {
     }
 });
 
-// 5. Claim item using passcode (Handover completed -> 3 Points added ONLY for Found / Offer)
+// 6. Claim item using passcode
 app.post('/api/items/:id/claim', async (req, res) => {
     try {
         const { passcode } = req.body;
@@ -151,14 +241,13 @@ app.post('/api/items/:id/claim', async (req, res) => {
             let currentPoints = 0;
             let currentBadge = getBadge(0).title;
 
-            // Karma points are awarded ONLY if the post was an "Offer" or "Found"
             const isHelperType = item.intent === 'Offer' || item.type === 'Found';
 
             if (isHelperType && item.rollNo) {
                 const helperRoll = item.rollNo.toUpperCase();
                 let user = await User.findOne({ rollNo: helperRoll });
 
-                earnedKarma = 3; // 3 Points per successful handover
+                earnedKarma = 3;
 
                 if (!user) {
                     user = new User({ rollNo: helperRoll, karmaPoints: earnedKarma });
@@ -186,7 +275,7 @@ app.post('/api/items/:id/claim', async (req, res) => {
     }
 });
 
-// 6. Report fake or spam post
+// 7. Report fake post
 app.post('/api/items/:id/report', async (req, res) => {
     try {
         const { userRollNo } = req.body;
@@ -212,7 +301,7 @@ app.post('/api/items/:id/report', async (req, res) => {
     }
 });
 
-// 7. Mark post as resolved
+// 8. Resolve post
 app.patch('/api/items/:id/resolve', async (req, res) => {
     try {
         const { rollNo } = req.body;
@@ -233,7 +322,7 @@ app.patch('/api/items/:id/resolve', async (req, res) => {
     }
 });
 
-// 8. Delete post permanently
+// 9. Delete post
 app.delete('/api/items/:id', async (req, res) => {
     try {
         const { rollNo } = req.body;
@@ -253,7 +342,7 @@ app.delete('/api/items/:id', async (req, res) => {
     }
 });
 
-// Fallback Middleware for Express 5 (Serves index.html for non-API routes)
+// Fallback Middleware
 app.use((req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
