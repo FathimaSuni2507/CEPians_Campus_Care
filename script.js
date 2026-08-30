@@ -14,7 +14,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.static(__dirname));
 
-// MongoDB Connection String
+// Correct MongoDB Connection String
 const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://fathimasuni25:fathimasuni25@cluster0.mongodb.net/cepians_care?retryWrites=true&w=majority";
 
 mongoose.connect(MONGO_URI)
