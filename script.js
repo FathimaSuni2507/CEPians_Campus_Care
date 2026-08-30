@@ -25,6 +25,7 @@ async function checkUserLoginStatus() {
             if (karmaRes.ok) {
                 const karmaData = await karmaRes.json();
                 user.points = karmaData.karmaPoints;
+                user.badge = karmaData.badge;
                 localStorage.setItem('cepUser', JSON.stringify(user));
             }
         } catch (err) {
@@ -37,17 +38,17 @@ async function checkUserLoginStatus() {
             userPoints.innerText = pts;
             
             if (userBadgeLevel) {
-                if (pts >= 100) {
-                    userBadgeLevel.innerText = "🥇 Champion";
+                // Backend Badge Title
+                const badgeTitle = user.badge || getFrontendBadgeTitle(pts);
+                userBadgeLevel.innerText = badgeTitle;
+
+                if (pts >= 200) {
+                    userBadgeLevel.className = "badge bg-dark text-warning ms-1 border border-warning";
+                } else if (pts >= 100) {
                     userBadgeLevel.className = "badge bg-dark text-warning ms-1";
                 } else if (pts >= 50) {
-                    userBadgeLevel.innerText = "🥈 Silver";
                     userBadgeLevel.className = "badge bg-dark text-info ms-1";
-                } else if (pts >= 10) {
-                    userBadgeLevel.innerText = "🥉 Helper";
-                    userBadgeLevel.className = "badge bg-dark text-white ms-1";
                 } else {
-                    userBadgeLevel.innerText = "Newbie";
                     userBadgeLevel.className = "badge bg-secondary ms-1";
                 }
             }
@@ -61,6 +62,14 @@ async function checkUserLoginStatus() {
             loginBtn.removeAttribute('data-bs-toggle');
         }
     }
+}
+
+// Fallback Badge Title Calculator
+function getFrontendBadgeTitle(points) {
+    if (points >= 200) return 'CEP Legend 🌟';
+    if (points >= 100) return 'CEP Champion 🏆';
+    if (points >= 50)  return 'CEP Helper 🤝';
+    return 'CEpian Contributor 🌱';
 }
 
 async function handleCollegeLogin(event) {
@@ -80,11 +89,13 @@ async function handleCollegeLogin(event) {
         const formattedRollNo = rollNo.toUpperCase();
         
         let initialKarma = 0;
+        let initialBadge = 'CEpian Contributor 🌱';
         try {
             const res = await fetch(`/api/users/${formattedRollNo}/karma`);
             if (res.ok) {
                 const karmaData = await res.json();
                 initialKarma = karmaData.karmaPoints;
+                initialBadge = karmaData.badge;
             }
         } catch (err) {
             console.error("Karma fetch error during login", err);
@@ -93,7 +104,8 @@ async function handleCollegeLogin(event) {
         const userData = {
             name: name,
             rollNo: formattedRollNo,
-            points: initialKarma
+            points: initialKarma,
+            badge: initialBadge
         };
 
         localStorage.setItem('cepUser', JSON.stringify(userData));
@@ -118,15 +130,6 @@ function handleLogout(event) {
     if (confirm("Are you sure you want to logout?")) {
         localStorage.removeItem('cepUser');
         location.reload();
-    }
-}
-
-function addKarmaPoints(pointsToAdd) {
-    let user = JSON.parse(localStorage.getItem('cepUser'));
-    if (user) {
-        user.points = (user.points || 0) + pointsToAdd;
-        localStorage.setItem('cepUser', JSON.stringify(user));
-        checkUserLoginStatus();
     }
 }
 
@@ -300,7 +303,12 @@ async function claimWithPasscode(itemId) {
         const data = await response.json();
 
         if (response.ok) {
-            alert("🎉 Handover Verified Successfully! +10 Karma points added.");
+            if (data.earnedKarma && data.earnedKarma > 0) {
+                alert(`🎉 Handover Verified Successfully!\nThe owner earned +${data.earnedKarma} Karma Points!\nOwner Rank: ${data.badge}`);
+            } else {
+                alert("🎉 Handover Verified Successfully!");
+            }
+            checkUserLoginStatus();
             fetchListings();
         } else {
             alert("❌ " + (data.error || "Incorrect passcode!"));
@@ -408,12 +416,7 @@ async function handleReportItem(event) {
         const result = await response.json();
 
         if (response.ok) {
-            if (result.earnedKarma && result.earnedKarma > 0) {
-                addKarmaPoints(result.earnedKarma);
-                alert(`Post published successfully! Passcode: ${result.item.passcode}. You earned +${result.earnedKarma} Karma Points! 🎉`);
-            } else {
-                alert(`Post published successfully! Your Claim Passcode is: ${result.item.passcode}`);
-            }
+            alert(`Post published successfully! Your Claim Passcode is: ${result.item.passcode}`);
             
             const reportModalElement = document.getElementById('reportModal');
             const reportModal = bootstrap.Modal.getInstance(reportModalElement);
