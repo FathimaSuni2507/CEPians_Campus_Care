@@ -26,37 +26,32 @@ mongoose.connect(MONGO_URI)
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-        user: process.env.EMAIL_USER || 'yourgmail@gmail.com', // Render Env variable
-        pass: process.env.EMAIL_PASS || 'your-app-password'   // Gmail App Password
+        user: process.env.EMAIL_USER || 'cepcampuscare.test@gmail.com',
+        pass: process.env.EMAIL_PASS || 'oylm jolo vjmq yenc'
     }
 });
 
 // Helper to send email notification
 async function sendMatchEmail(toEmail, userPost, matchedPost) {
-    if (!process.env.EMAIL_USER || process.env.EMAIL_USER === 'yourgmail@gmail.com') {
-        console.log("⚠️ Email credentials not set in Environment Variables. Skipping email send.");
-        return;
-    }
-
     const mailOptions = {
-        from: `"CEPians Campus Care" <${process.env.EMAIL_USER}>`,
+        from: `"CEPians Campus Care" <${process.env.EMAIL_USER || 'cepcampuscare.test@gmail.com'}>`,
         to: toEmail,
-        subject: `🔔 Potential Match Found for your CEP Listing: ${userPost.title}`,
+        subject: `🔔 Match Alert: Your CEP Listing (${userPost.title})`,
         html: `
-            <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #e0e0e0; rounded: 10px;">
+            <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
                 <h2 style="color: #0d6efd;">CEPians Campus Care Alert!</h2>
                 <p>Hello <strong>${userPost.postedBy}</strong>,</p>
-                <p>We found a potential match on the campus feed for your recent post: <strong>"${userPost.title}"</strong>.</p>
+                <p>We found a potential match on the campus feed for your item: <strong>"${userPost.title}"</strong>!</p>
                 <hr/>
                 <h3>Matched Item Details:</h3>
                 <ul>
-                    <li><strong>Item:</strong> ${matchedPost.title}</li>
+                    <li><strong>Item Title:</strong> ${matchedPost.title}</li>
                     <li><strong>Category:</strong> ${matchedPost.type} (${matchedPost.intent})</li>
                     <li><strong>Location:</strong> ${matchedPost.location}</li>
                     <li><strong>Posted By:</strong> ${matchedPost.postedBy}</li>
                     <li><strong>Contact Email:</strong> <a href="mailto:${matchedPost.email}">${matchedPost.email}</a></li>
                 </ul>
-                <p>Please connect with them to verify if this is your item/resource.</p>
+                <p>Please connect with them to verify your item.</p>
                 <br>
                 <p style="font-size: 12px; color: #777;">College of Engineering Perumon - Student Support Portal</p>
             </div>
@@ -65,14 +60,13 @@ async function sendMatchEmail(toEmail, userPost, matchedPost) {
 
     try {
         await transporter.sendMail(mailOptions);
-        console.log(`📧 Match Notification Email sent successfully to ${toEmail}`);
+        console.log(`📧 Notification Email sent successfully to ${toEmail}`);
     } catch (error) {
         console.error("❌ Email Sending Error:", error);
     }
 }
 
-// ================= HELPER FUNCTIONS =================
-
+// Helper Badge logic
 function getBadge(points) {
     if (points >= 200) return { title: 'CEP Legend 🌟', level: 'Legend' };
     if (points >= 100) return { title: 'CEP Champion 🏆', level: 'Champion' };
@@ -98,6 +92,7 @@ const ItemSchema = new mongoose.Schema({
         type: String, 
         default: () => Math.floor(1000 + Math.random() * 9000).toString() 
     },
+    matchedWith: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', default: null },
     isFlagged: { type: Boolean, default: false },
     isResolved: { type: Boolean, default: false },
     reports: [String],
@@ -139,39 +134,38 @@ app.post('/api/items', async (req, res) => {
         res.status(201).json({ item: newItem, earnedKarma: 0 });
     } catch (err) {
         console.error("Error creating item:", err);
-        res.status(500).json({ error: "Failed to save post. Please try again." });
+        res.status(500).json({ error: "Failed to save post." });
     }
 });
 
-// 3. AUTO MATCH FINDER ROUTE + EMAIL NOTIFICATION
+// 3. AUTO MATCH ROUTE (SMART KEYWORD MATCHING)
 app.get('/api/items/:id/matches', async (req, res) => {
     try {
         const currentItem = await Item.findById(req.params.id);
         if (!currentItem) return res.status(404).json({ error: "Item not found" });
 
-        // Opposite search: Lost <-> Found, Request <-> Offer
         const targetType = currentItem.type === 'Lost' ? 'Found' : (currentItem.type === 'Found' ? 'Lost' : currentItem.type);
-        const targetIntent = currentItem.intent === 'Request' ? 'Offer' : 'Request';
 
-        // Match based on title keywords (Case Insensitive)
-        const cleanTitle = currentItem.title.replace(/[^a-zA-Z0-9 ]/g, "").trim();
-        const keywords = cleanTitle.split(" ").filter(w => w.length > 2);
-        
-        const searchRegex = keywords.length > 0 ? keywords.join("|") : cleanTitle;
+        // Extract first word (e.g. "Casio" from "Casio Calculator")
+        const firstWord = currentItem.title.trim().split(/\s+/)[0];
 
         const matches = await Item.find({
             _id: { $ne: currentItem._id },
             isResolved: { $ne: true },
-            $or: [
-                { type: targetType },
-                { intent: targetIntent }
-            ],
-            title: { $regex: searchRegex, $options: 'i' }
+            type: targetType,
+            title: { $regex: firstWord, $options: 'i' }
         }).limit(3);
 
         if (matches.length > 0) {
-            // Trigger background Email Notification
-            sendMatchEmail(currentItem.email, currentItem, matches[0]);
+            const matchedPost = matches[0];
+
+            // Link items together
+            currentItem.matchedWith = matchedPost._id;
+            await currentItem.save();
+
+            // Send notification emails to both users
+            sendMatchEmail(currentItem.email, currentItem, matchedPost);
+            sendMatchEmail(matchedPost.email, matchedPost, currentItem);
         }
 
         res.json({
@@ -184,48 +178,7 @@ app.get('/api/items/:id/matches', async (req, res) => {
     }
 });
 
-// 4. Get Karma Points & Badge details for a specific user
-app.get('/api/users/:rollNo/karma', async (req, res) => {
-    try {
-        const formattedRoll = req.params.rollNo.toUpperCase();
-        const user = await User.findOne({ rollNo: formattedRoll });
-        const points = user ? user.karmaPoints : 0;
-        const badge = getBadge(points);
-
-        res.json({ 
-            rollNo: formattedRoll,
-            karmaPoints: points, 
-            badge: badge.title,
-            level: badge.level
-        });
-    } catch (err) {
-        console.error("Karma fetch error:", err);
-        res.status(500).json({ error: "Failed to fetch karma points" });
-    }
-});
-
-// 5. Karma Leaderboard
-app.get('/api/leaderboard', async (req, res) => {
-    try {
-        const topUsers = await User.find({ karmaPoints: { $gt: 0 } })
-            .sort({ karmaPoints: -1 })
-            .limit(10);
-
-        const leaderboard = topUsers.map((user, index) => ({
-            rank: index + 1,
-            rollNo: user.rollNo,
-            karmaPoints: user.karmaPoints,
-            badge: getBadge(user.karmaPoints).title
-        }));
-
-        res.json(leaderboard);
-    } catch (err) {
-        console.error("Leaderboard error:", err);
-        res.status(500).json({ error: "Failed to fetch leaderboard" });
-    }
-});
-
-// 6. Claim item using passcode
+// 4. Claim item (Marks BOTH matched items as RESOLVED so they DISAPPEAR)
 app.post('/api/items/:id/claim', async (req, res) => {
     try {
         const { passcode } = req.body;
@@ -237,13 +190,16 @@ app.post('/api/items/:id/claim', async (req, res) => {
             item.isResolved = true;
             await item.save();
 
+            // Matched item ഉണ്ടെങ്കിൽ അതും Auto-Resolve ആക്കും (Feed-ൽ നിന്ന് Disappear ആകും)
+            if (item.matchedWith) {
+                await Item.findByIdAndUpdate(item.matchedWith, { isResolved: true });
+            }
+
             let earnedKarma = 0;
             let currentPoints = 0;
             let currentBadge = getBadge(0).title;
 
-            const isHelperType = item.intent === 'Offer' || item.type === 'Found';
-
-            if (isHelperType && item.rollNo) {
+            if ((item.intent === 'Offer' || item.type === 'Found') && item.rollNo) {
                 const helperRoll = item.rollNo.toUpperCase();
                 let user = await User.findOne({ rollNo: helperRoll });
 
@@ -261,7 +217,7 @@ app.post('/api/items/:id/claim', async (req, res) => {
             }
 
             res.json({ 
-                message: "Handover verified successfully!",
+                message: "Handover verified! Both items marked as resolved.",
                 earnedKarma: earnedKarma,
                 totalKarma: currentPoints,
                 badge: currentBadge
@@ -275,7 +231,26 @@ app.post('/api/items/:id/claim', async (req, res) => {
     }
 });
 
-// 7. Report fake post
+// 5. User Karma Details
+app.get('/api/users/:rollNo/karma', async (req, res) => {
+    try {
+        const formattedRoll = req.params.rollNo.toUpperCase();
+        const user = await User.findOne({ rollNo: formattedRoll });
+        const points = user ? user.karmaPoints : 0;
+        const badge = getBadge(points);
+
+        res.json({ 
+            rollNo: formattedRoll,
+            karmaPoints: points, 
+            badge: badge.title,
+            level: badge.level
+        });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch karma points" });
+    }
+});
+
+// 6. Report fake post
 app.post('/api/items/:id/report', async (req, res) => {
     try {
         const { userRollNo } = req.body;
@@ -296,12 +271,11 @@ app.post('/api/items/:id/report', async (req, res) => {
             res.status(400).json({ error: "You have already reported this post." });
         }
     } catch (err) {
-        console.error("Report error:", err);
         res.status(500).json({ error: "Failed to report post" });
     }
 });
 
-// 8. Resolve post
+// 7. Resolve single post manually
 app.patch('/api/items/:id/resolve', async (req, res) => {
     try {
         const { rollNo } = req.body;
@@ -312,17 +286,22 @@ app.patch('/api/items/:id/resolve', async (req, res) => {
         if (rollNo && item.rollNo.toUpperCase() === rollNo.toUpperCase()) {
             item.isResolved = true;
             await item.save();
+
+            // Matched Item ഉണ്ടെങ്കിൽ അതും Disappear ചെയ്യും
+            if (item.matchedWith) {
+                await Item.findByIdAndUpdate(item.matchedWith, { isResolved: true });
+            }
+
             res.json({ message: "Post marked as resolved successfully." });
         } else {
             res.status(403).json({ error: "Unauthorized: Only the owner can resolve this post." });
         }
     } catch (err) {
-        console.error("Resolve error:", err);
         res.status(500).json({ error: "Failed to resolve post" });
     }
 });
 
-// 9. Delete post
+// 8. Delete post
 app.delete('/api/items/:id', async (req, res) => {
     try {
         const { rollNo } = req.body;
@@ -334,10 +313,9 @@ app.delete('/api/items/:id', async (req, res) => {
             await Item.findByIdAndDelete(req.params.id);
             res.json({ message: "Post deleted successfully." });
         } else {
-            res.status(403).json({ error: "Unauthorized: Only the owner can delete this post." });
+            res.status(403).json({ error: "Unauthorized: Only owner can delete this post." });
         }
     } catch (err) {
-        console.error("Delete error:", err);
         res.status(500).json({ error: "Failed to delete post" });
     }
 });
