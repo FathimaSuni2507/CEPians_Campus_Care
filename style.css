@@ -1,0 +1,156 @@
+/* ================= GLOBAL STYLES & VARIABLES ================= */
+:root {
+    --primary-color: #0d6efd;
+    --primary-hover: #0b5ed7;
+    --secondary-color: #6c757d;
+    --success-color: #198754;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+    --light-bg: #f8f9fa;
+    --dark-text: #212529;
+    --card-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+    --hover-shadow: 0 15px 30px rgba(0, 0, 0, 0.12);
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f4f6f9;
+    color: var(--dark-text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+main {
+    flex: 1;
+}
+
+/* ================= NAVBAR STYLING ================= */
+.navbar {
+    backdrop-filter: blur(10px);
+    background-color: var(--primary-color) !important;
+}
+
+.navbar-brand {
+    letter-spacing: 0.5px;
+}
+
+#userBadge {
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+/* ================= HERO & BANNER SECTION ================= */
+.hero-section {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a4baf 100%);
+    color: white;
+    border-radius: 20px;
+    padding: 3rem 2rem;
+    box-shadow: 0 10px 25px rgba(13, 110, 253, 0.2);
+}
+
+.counter-card {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    padding: 1.2rem;
+    text-align: center;
+    color: white;
+    transition: transform 0.3s ease;
+}
+
+.counter-card:hover {
+    transform: translateY(-5px);
+}
+
+.counter-card h3 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    margin-bottom: 0;
+}
+
+/* ================= CARD STYLING & HOVER EFFECTS ================= */
+.card-hover {
+    transition: all 0.3s ease-in-out;
+}
+
+.card-hover:hover {
+    transform: translateY(-8px);
+    box-shadow: var(--hover-shadow) !important;
+}
+
+.card-img-top {
+    transition: transform 0.5s ease;
+}
+
+.card-hover:hover .card-img-top {
+    transform: scale(1.03);
+}
+
+.badge {
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+/* ================= QR SCANNER SECTION ================= */
+#reader {
+    background-color: #ffffff;
+    border: 2px dashed #cbd5e1 !important;
+}
+
+#reader video {
+    object-fit: cover !important;
+    border-radius: 8px;
+}
+
+/* HTML5 QR Scanner UI tweaks */
+#reader__dashboard_section_csr button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    margin-top: 10px;
+}
+
+#reader__dashboard_section_csr button:hover {
+    background-color: var(--primary-hover);
+}
+
+/* ================= MODAL & FORM STYLING ================= */
+.modal-content {
+    border-radius: 20px;
+    overflow: hidden;
+}
+
+.form-control, .form-select {
+    padding: 0.65rem 1rem;
+    border-radius: 10px;
+    border: 1px solid #dee2e6;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+}
+
+/* ================= FOOTER STYLING ================= */
+footer {
+    background-color: #ffffff;
+    border-top: 1px solid #e9ecef;
+}
+
+/* Responsive fixes */
+@media (max-width: 576px) {
+    .hero-section {
+        padding: 2rem 1rem;
+    }
+    
+    .counter-card {
+        margin-bottom: 1rem;
+    }
+}

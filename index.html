@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CEPians Campus Care - College of Engineering Perumon</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- ================= NAVBAR ================= -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold fs-4" href="#">
+                <i class="fa-solid fa-graduation-cap me-2"></i>CEPians Campus Care
+            </a>
+
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#feed">Campus Feed</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#modules">Services</a>
+                    </li>
+                </ul>
+
+                <div class="d-flex align-items-center gap-2">
+                    <!-- User Karma Points Badge -->
+                    <span id="userBadge" class="badge bg-warning text-dark d-none py-2 px-3 rounded-pill shadow-sm" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#perksModal" title="Click to view Karma Perks">
+                        <i class="fa-solid fa-star me-1 text-danger"></i> <span id="userPoints">0</span> Karma <span id="userBadgeLevel" class="badge bg-dark ms-1">Newbie</span>
+                    </span>
+
+                    <!-- Login Button -->
+                    <button id="loginBtn" class="btn btn-light btn-sm fw-bold rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#loginModal">
+                        <i class="fa-solid fa-right-to-bracket me-1"></i> CEP Login
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ================= HERO SECTION ================= -->
+    <header class="hero-section text-center text-white d-flex align-items-center justify-content-center py-5">
+        <div class="container">
+            <h1 class="display-4 fw-bold">Welcome to CEPians Campus Care!</h1>
+            <p class="lead text-light opacity-90">College of Engineering Perumon's Student Support & Community Portal</p>
+            <div class="mt-4">
+                <button class="btn btn-warning btn-lg fw-bold rounded-pill px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#reportModal">
+                    <i class="fa-solid fa-plus-circle me-1"></i> Post Item / Resource
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- ================= DYNAMIC COUNTERS ================= -->
+    <section class="container my-5">
+        <div class="row text-center g-3">
+            <div class="col-md-4">
+                <div class="card card-stat border-0 shadow-sm p-3 bg-danger-subtle text-danger rounded-4">
+                    <h2 class="fw-bold" id="lostCounter">0</h2>
+                    <p class="mb-0 fw-semibold"><i class="fa-solid fa-box-open me-1"></i> Lost Items Reported</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card card-stat border-0 shadow-sm p-3 bg-success-subtle text-success rounded-4">
+                    <h2 class="fw-bold" id="foundCounter">0</h2>
+                    <p class="mb-0 fw-semibold"><i class="fa-solid fa-hand-holding-heart me-1"></i> Items Found & Handed</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card card-stat border-0 shadow-sm p-3 bg-primary-subtle text-primary rounded-4">
+                    <h2 class="fw-bold" id="resourceCounter">0</h2>
+                    <p class="mb-0 fw-semibold"><i class="fa-solid fa-book-open me-1"></i> Active Resources & Skills</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================= MODULE HIGHLIGHTS ================= -->
+    <section id="modules" class="container my-5">
+        <h3 class="fw-bold mb-4 border-start border-4 border-primary ps-2">Explore Campus Care Services</h3>
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm rounded-4 text-center p-4">
+                    <div class="fs-1 text-danger mb-3"><i class="fa-solid fa-magnifying-glass-location"></i></div>
+                    <h5 class="fw-bold">Lost & Found</h5>
+                    <p class="text-muted small">Quickly report lost belongings or register items you found around CEP campus with photo & location.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm rounded-4 text-center p-4">
+                    <div class="fs-1 text-primary mb-3"><i class="fa-solid fa-book-bookmark"></i></div>
+                    <h5 class="fw-bold">Resource Sharing</h5>
+                    <p class="text-muted small">Share text books, lab coats, drafters, or electronics with fellow students safely within departments.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm rounded-4 text-center p-4">
+                    <div class="fs-1 text-success mb-3"><i class="fa-solid fa-people-arrows"></i></div>
+                    <h5 class="fw-bold">Skill Sharing</h5>
+                    <p class="text-muted small">Offer coding help, project guidance, or exam prep support to juniors and earn campus Karma Points.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================= MAIN FEED ================= -->
+    <main id="feed" class="container mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="fw-bold border-start border-4 border-primary ps-2 mb-0">Recent Campus Feed</h3>
+            <button class="btn btn-outline-primary btn-sm rounded-pill" onclick="fetchListings()">
+                <i class="fa-solid fa-rotate-right me-1"></i> Refresh Feed
+            </button>
+        </div>
+
+        <!-- CATEGORY TABS -->
+        <div class="d-flex flex-wrap gap-2 mb-4">
+            <button class="btn btn-primary btn-sm rounded-pill px-3 filter-btn active" data-category="all">All Listings</button>
+            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3 filter-btn" data-category="Lost">Lost</button>
+            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3 filter-btn" data-category="Found">Found</button>
+            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3 filter-btn" data-category="Resource">Resources</button>
+            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3 filter-btn" data-category="Skill">Skills</button>
+        </div>
+
+        <div class="row g-4" id="listingsContainer">
+            <div class="text-center py-5 text-muted">
+                <i class="fa-solid fa-spinner fa-spin fa-2x mb-2"></i>
+                <p>Loading campus listings from MongoDB...</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- ================= KARMA PERKS MODAL ================= -->
+    <div class="modal fade" id="perksModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4 border-0 shadow">
+                <div class="modal-header bg-warning text-dark rounded-top-4">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-trophy me-2"></i>CEP Karma Rewards & Badges</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <h6 class="fw-bold text-primary mb-3"><i class="fa-solid fa-award me-1"></i> Student Rank Tiers:</h6>
+                    <ul class="list-group list-group-flush mb-4 small">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>🥉 <strong>Helper (10 - 40 Points)</strong></span>
+                            <span class="badge bg-secondary">Level 1</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>🥈 <strong>Silver Contributor (50 - 90 Points)</strong></span>
+                            <span class="badge bg-info text-dark">Level 2</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>🥇 <strong>Gold Champion (100+ Points)</strong></span>
+                            <span class="badge bg-warning text-dark">Level 3</span>
+                        </li>
+                    </ul>
+
+                    <h6 class="fw-bold text-success mb-2"><i class="fa-solid fa-gift me-1"></i> Point Benefits:</h6>
+                    <p class="small text-muted mb-1">✓ Build genuine student trust profile in campus</p>
+                    <p class="small text-muted mb-1">✓ Get Featured/Highlighted slots for urgent Lost Posts</p>
+                    <p class="small text-muted mb-0">✓ Priority access during CEP Fest / Workshop registrations</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= STUDENT LOGIN MODAL ================= -->
+    <div class="modal fade" id="loginModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4 border-0 shadow">
+                <div class="modal-header bg-primary text-white rounded-top-4">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-graduation-cap me-2"></i>CEP Student Verification</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form onsubmit="handleCollegeLogin(event)">
+                        <div class="mb-3">
+                            <label for="studentName" class="form-label fw-semibold">Your Name</label>
+                            <input type="text" id="studentName" class="form-control rounded-3" placeholder="e.g. Rahael" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="studentRollNo" class="form-label fw-semibold">Roll Number / Student ID</label>
+                            <input type="text" id="studentRollNo" class="form-control rounded-3" placeholder="e.g. S3CSA53" required>
+                            <small class="text-muted">Format must match College ID (e.g. S3CSA53, S1ECE12)</small>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 fw-bold rounded-3 py-2 mt-2 shadow-sm">Login to Campus Care</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= POST ITEM / RESOURCE MODAL ================= -->
+    <div class="modal fade" id="reportModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content rounded-4 border-0 shadow">
+                <div class="modal-header bg-dark text-white rounded-top-4">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-plus-circle me-2"></i>Post New Item / Resource</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form onsubmit="handleReportItem(event)">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label for="type" class="form-label fw-semibold">Category Type</label>
+                                <select id="type" class="form-select rounded-3" onchange="toggleIntentOptions()" required>
+                                    <option value="Lost">Lost Item</option>
+                                    <option value="Found">Found Item</option>
+                                    <option value="Resource">Resource Share</option>
+                                    <option value="Skill">Skill Share</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="intent" class="form-label fw-semibold">Listing Action</label>
+                                <select id="intent" class="form-select rounded-3" required>
+                                    <option value="Request">Requesting (Need Help/Resource)</option>
+                                    <option value="Offer">Offering (Providing to others)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="title" class="form-label fw-semibold">Item / Title</label>
+                                <input type="text" id="title" class="form-control rounded-3" placeholder="e.g. Casio Calculator" required minlength="3">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="brand" class="form-label fw-semibold">Brand / Department</label>
+                                <input type="text" id="brand" class="form-control rounded-3" placeholder="e.g. Casio / CSE Dept">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="color" class="form-label fw-semibold">Color / Feature</label>
+                                <input type="text" id="color" class="form-control rounded-3" placeholder="e.g. Black / fx-991CW">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="location" class="form-label fw-semibold">Campus Location</label>
+                                <input type="text" id="location" class="form-control rounded-3" placeholder="e.g. Main Canteen / Seminar Hall" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="email" class="form-label fw-semibold">Your Email</label>
+                                <input type="email" id="email" class="form-control rounded-3" placeholder="e.g. yourname@gmail.com" required>
+                            </div>
+                            <div class="col-12">
+                                <label for="imageUrl" class="form-label fw-semibold">Image URL (Optional)</label>
+                                <input type="url" id="imageUrl" class="form-control rounded-3" placeholder="https://example.com/image.jpg">
+                            </div>
+                            <div class="col-12">
+                                <label for="description" class="form-label fw-semibold">Description</label>
+                                <textarea id="description" class="form-control rounded-3" rows="3" placeholder="Add specific details about the item or resource..." required minlength="8"></textarea>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-warning w-100 fw-bold rounded-3 py-2 mt-4 shadow-sm">Submit Post</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= AUTO MATCH ALERT MODAL ================= -->
+    <div class="modal fade" id="matchModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4 border-0 shadow">
+                <div class="modal-header bg-success text-white rounded-top-4">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-wand-magic-sparkles me-2"></i>Potential Match Found!</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4 text-center">
+                    <p class="fw-semibold text-secondary">We found an existing post matching your item in campus feed:</p>
+                    <div id="matchCardContent" class="p-3 bg-light border rounded-3 mb-3 text-start"></div>
+                    <button class="btn btn-primary w-100 rounded-pill fw-bold" data-bs-dismiss="modal">Got It, Thanks!</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= FOOTER ================= -->
+    <footer class="bg-dark text-white py-4 mt-5">
+        <div class="container text-center">
+            <p class="mb-1 fw-bold">College of Engineering Perumon (CEP)</p>
+            <p class="text-muted small mb-0">CEPians Campus Care &copy; Lost, Found & Resource Sharing Portal</p>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="script.js"></script>
+</body>
+</html>
