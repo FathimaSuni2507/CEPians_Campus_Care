@@ -208,8 +208,8 @@ app.delete('/api/items/:id', async (req, res) => {
     }
 });
 
-// Serve frontend for all remaining GET routes
-app.get('(.*)', (req, res) => {
+// Fallback Middleware for Express 5 (Serves index.html for non-API routes)
+app.use((req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
