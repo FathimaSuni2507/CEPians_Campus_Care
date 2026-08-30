@@ -14,8 +14,8 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.static(__dirname));
 
-// Correct MongoDB Connection String
-const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://fathimasuni25:fathimasuni25@cluster0.mongodb.net/cepians_care?retryWrites=true&w=majority";
+// MongoDB Connection String
+const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://fathimasuni25_db_user:Xg84eUcvKK4hAHtR@cluster0.9yeaire.mongodb.net/cepians_care?retryWrites=true&w=majority";
 
 mongoose.connect(MONGO_URI)
     .then(() => console.log('✅ Connected to CEP MongoDB Database successfully!'))
@@ -96,31 +96,15 @@ app.post('/api/items', async (req, res) => {
     }
 });
 
-// 3. Auto-match checking for newly posted item
-app.get('/api/items/:id/matches', async (req, res) => {
+// 3. Get Karma Points for a specific user
+app.get('/api/users/:rollNo/karma', async (req, res) => {
     try {
-        const currentItem = await Item.findById(req.params.id);
-        if (!currentItem) return res.status(404).json({ error: "Item not found" });
-
-        // Opposite intent mapping (Request <-> Offer)
-        const targetIntent = currentItem.intent === 'Request' ? 'Offer' : 'Request';
-
-        // Search for matches based on title/brand/color keywords
-        const matches = await Item.find({
-            _id: { $ne: currentItem._id },
-            isResolved: { $ne: true },
-            intent: targetIntent,
-            $or: [
-                { title: { $regex: currentItem.title, $options: 'i' } },
-                { brand: { $regex: currentItem.brand || '---', $options: 'i' } },
-                { description: { $regex: currentItem.title, $options: 'i' } }
-            ]
-        });
-
-        res.json({ matchesCount: matches.length, matches });
+        const formattedRoll = req.params.rollNo.toUpperCase();
+        const user = await User.findOne({ rollNo: formattedRoll });
+        res.json({ karmaPoints: user ? user.karmaPoints : 0 });
     } catch (err) {
-        console.error("Auto-match error:", err);
-        res.status(500).json({ error: "Failed to fetch auto-matches" });
+        console.error("Karma fetch error:", err);
+        res.status(500).json({ error: "Failed to fetch karma points" });
     }
 });
 
@@ -157,19 +141,7 @@ app.post('/api/items/:id/claim', async (req, res) => {
     }
 });
 
-// 5. Get Karma Points for a specific user
-app.get('/api/users/:rollNo/karma', async (req, res) => {
-    try {
-        const formattedRoll = req.params.rollNo.toUpperCase();
-        const user = await User.findOne({ rollNo: formattedRoll });
-        res.json({ karmaPoints: user ? user.karmaPoints : 0 });
-    } catch (err) {
-        console.error("Karma fetch error:", err);
-        res.status(500).json({ error: "Failed to fetch karma points" });
-    }
-});
-
-// 6. Report fake or spam post
+// 5. Report fake or spam post
 app.post('/api/items/:id/report', async (req, res) => {
     try {
         const { userRollNo } = req.body;
@@ -195,7 +167,7 @@ app.post('/api/items/:id/report', async (req, res) => {
     }
 });
 
-// 7. Mark post as resolved
+// 6. Mark post as resolved
 app.patch('/api/items/:id/resolve', async (req, res) => {
     try {
         const { rollNo } = req.body;
@@ -216,7 +188,7 @@ app.patch('/api/items/:id/resolve', async (req, res) => {
     }
 });
 
-// 8. Delete post permanently
+// 7. Delete post permanently
 app.delete('/api/items/:id', async (req, res) => {
     try {
         const { rollNo } = req.body;
@@ -237,7 +209,7 @@ app.delete('/api/items/:id', async (req, res) => {
 });
 
 // Serve frontend for all remaining GET routes
-app.get('*', (req, res) => {
+app.get('(.*)', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
