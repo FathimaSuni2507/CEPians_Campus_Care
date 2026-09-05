@@ -27,7 +27,7 @@ const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 465,
     secure: true,
-    family: 4, // Forces IPv4 to fix Render connection timeouts (ENETUNREACH)
+    family: 4, // Forces IPv4 to fix Render connection timeouts
     auth: {
         user: process.env.EMAIL_USER || 'cepcampuscare.test@gmail.com',
         pass: process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/\s+/g, '') : 'oylmjolovjmqyenc'
@@ -38,9 +38,9 @@ const transporter = nodemailer.createTransport({
 });
 
 // Helper to send email notification
-async function sendMatchEmail(toEmail, userPost, matchedPost) {
+function sendMatchEmail(toEmail, userPost, matchedPost) {
     if (!toEmail) return;
-    
+
     const mailOptions = {
         from: `"CEPians Campus Care" <${process.env.EMAIL_USER || 'cepcampuscare.test@gmail.com'}>`,
         to: toEmail,
@@ -66,59 +66,13 @@ async function sendMatchEmail(toEmail, userPost, matchedPost) {
         `
     };
 
-    try {
-        const info = await transporter.sendMail(mailOptions);
-        console.log(`📧 Notification Email sent successfully to ${toEmail}:`, info.response);
-    } catch (error) {
-        console.error("❌ Email Sending Error:", error);
-    }
-}
-
-// Smart Auto-Matching Engine Logic
-async function findAndNotifyMatches(newItem) {
-    try {
-        const targetType = newItem.type === 'Lost' ? 'Found' : (newItem.type === 'Found' ? 'Lost' : null);
-        if (!targetType) return null;
-
-        // Extract key search terms (filtering out small words)
-        const searchWords = newItem.title
-            .trim()
-            .split(/\s+/)
-            .filter(word => word.length > 2);
-
-        if (searchWords.length === 0) return null;
-
-        const regexPattern = searchWords.join('|');
-
-        const matches = await Item.find({
-            _id: { $ne: newItem._id },
-            isResolved: { $ne: true },
-            type: targetType,
-            title: { $regex: regexPattern, $options: 'i' }
-        }).sort({ createdAt: -1 }).limit(3);
-
-        if (matches.length > 0) {
-            const matchedPost = matches[0];
-
-            // Link items in database
-            newItem.matchedWith = matchedPost._id;
-            await newItem.save();
-
-            matchedPost.matchedWith = newItem._id;
-            await matchedPost.save();
-
-            console.log(`✨ Match found between "${newItem.title}" and "${matchedPost.title}"`);
-
-            // Trigger notification emails
-            await sendMatchEmail(newItem.email, newItem, matchedPost);
-            await sendMatchEmail(matchedPost.email, matchedPost, newItem);
-            
-            return matchedPost;
+    transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+            console.error("❌ Email Sending Error:", error);
+        } else {
+            console.log(`📧 Notification Email sent to ${toEmail}:`, info.response);
         }
-    } catch (err) {
-        console.error("❌ Auto Match Logic Error:", err);
-    }
-    return null;
+    });
 }
 
 // Helper Badge logic
@@ -175,42 +129,75 @@ app.get('/api/items', async (req, res) => {
     }
 });
 
-// 2. Post a new item/request (NOW AUTOMATICALLY CHECKS MATCHES & SENDS EMAILS)
+// 2. Post a new item/request (WITH DAILY LIMIT OF 4 POSTS)
 app.post('/api/items', async (req, res) => {
     try {
         const itemData = req.body;
-        if (itemData.rollNo) {
-            itemData.rollNo = itemData.rollNo.toUpperCase();
+        if (!itemData.rollNo) {
+            return res.status(400).json({ error: "Roll number is required!" });
+        }
+        itemData.rollNo = itemData.rollNo.toUpperCase();
+
+        // Check daily limit (Today's posts by this Roll No)
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const todayPostCount = await Item.countDocuments({
+            rollNo: itemData.rollNo,
+            createdAt: { $gte: startOfDay }
+        });
+
+        if (todayPostCount >= 4) {
+            return res.status(400).json({ 
+                error: "Daily limit reached! You can only post 4 items per day." 
+            });
         }
 
         const newItem = new Item(itemData);
         await newItem.save();
 
-        // Run matching immediately in background
-        const matchedItem = await findAndNotifyMatches(newItem);
-
-        res.status(201).json({ 
-            item: newItem, 
-            matchedWith: matchedItem,
-            earnedKarma: 0 
-        });
+        res.status(201).json({ item: newItem, earnedKarma: 0 });
     } catch (err) {
         console.error("Error creating item:", err);
         res.status(500).json({ error: "Failed to save post." });
     }
 });
 
-// 3. MANUAL AUTO MATCH ROUTE (FOR RETRYING MATCHES)
+// 3. AUTO MATCH ROUTE
 app.get('/api/items/:id/matches', async (req, res) => {
     try {
         const currentItem = await Item.findById(req.params.id);
         if (!currentItem) return res.status(404).json({ error: "Item not found" });
 
-        const matchedPost = await findAndNotifyMatches(currentItem);
+        const targetType = currentItem.type === 'Lost' ? 'Found' : (currentItem.type === 'Found' ? 'Lost' : currentItem.type);
+
+        const firstWord = currentItem.title.trim().split(/\s+/)[0];
+
+        const matches = await Item.find({
+            _id: { $ne: currentItem._id },
+            isResolved: { $ne: true },
+            type: targetType,
+            title: { $regex: firstWord, $options: 'i' }
+        }).limit(3);
+
+        if (matches.length > 0) {
+            const matchedPost = matches[0];
+
+            // Link items together both ways
+            currentItem.matchedWith = matchedPost._id;
+            await currentItem.save();
+
+            matchedPost.matchedWith = currentItem._id;
+            await matchedPost.save();
+
+            // Send notification emails in background
+            sendMatchEmail(currentItem.email, currentItem, matchedPost);
+            sendMatchEmail(matchedPost.email, matchedPost, currentItem);
+        }
 
         res.json({
-            matchesCount: matchedPost ? 1 : 0,
-            matches: matchedPost ? [matchedPost] : []
+            matchesCount: matches.length,
+            matches: matches
         });
     } catch (err) {
         console.error("Auto match error:", err);
@@ -218,7 +205,7 @@ app.get('/api/items/:id/matches', async (req, res) => {
     }
 });
 
-// 4. Claim item (Marks BOTH matched items as RESOLVED so they DISAPPEAR)
+// 4. Claim item (DISAPPEARS BOTH MATCHED ITEMS & KARMA ONLY FOR FOUND/OFFER)
 app.post('/api/items/:id/claim', async (req, res) => {
     try {
         const { passcode } = req.body;
@@ -227,10 +214,11 @@ app.post('/api/items/:id/claim', async (req, res) => {
         if (!item) return res.status(404).json({ error: "Item not found" });
 
         if (item.passcode === passcode) {
+            // Mark current item as resolved
             item.isResolved = true;
             await item.save();
 
-            // Matched item ഉണ്ടെങ്കിൽ അതും Auto-Resolve ആക്കും (Feed-ൽ നിന്ന് Disappear ആകും)
+            // Matched item ഉണ്ടെങ്കിൽ അതും Auto-Resolve ആയി സ്ക്രീനിൽ നിന്ന് Disappear ആകും
             if (item.matchedWith) {
                 await Item.findByIdAndUpdate(item.matchedWith, { isResolved: true });
             }
@@ -239,7 +227,8 @@ app.post('/api/items/:id/claim', async (req, res) => {
             let currentPoints = 0;
             let currentBadge = getBadge(0).title;
 
-            if ((item.intent === 'Offer' || item.type === 'Found') && item.rollNo) {
+            // ONLY 'Found' OR 'Offer' GETS KARMA POINTS (+3)
+            if ((item.type === 'Found' || item.intent === 'Offer') && item.rollNo) {
                 const helperRoll = item.rollNo.toUpperCase();
                 let user = await User.findOne({ rollNo: helperRoll });
 
@@ -257,7 +246,7 @@ app.post('/api/items/:id/claim', async (req, res) => {
             }
 
             res.json({ 
-                message: "Handover verified! Both items marked as resolved.",
+                message: "Handover verified! Both items marked as resolved and removed from feed.",
                 earnedKarma: earnedKarma,
                 totalKarma: currentPoints,
                 badge: currentBadge
@@ -290,7 +279,7 @@ app.get('/api/users/:rollNo/karma', async (req, res) => {
     }
 });
 
-// 6. Report fake post
+// 6. Report fake post (Flagged after 5 reports)
 app.post('/api/items/:id/report', async (req, res) => {
     try {
         const { userRollNo } = req.body;
@@ -302,7 +291,9 @@ app.post('/api/items/:id/report', async (req, res) => {
 
         if (!item.reports.includes(formattedRoll)) {
             item.reports.push(formattedRoll);
-            if (item.reports.length >= 2) {
+            
+            // Limit changed to 5 reports
+            if (item.reports.length >= 5) {
                 item.isFlagged = true;
             }
             await item.save();
@@ -327,14 +318,13 @@ app.patch('/api/items/:id/resolve', async (req, res) => {
             item.isResolved = true;
             await item.save();
 
-            // Matched Item ഉണ്ടെങ്കിൽ അതും Disappear ചെയ്യും
             if (item.matchedWith) {
                 await Item.findByIdAndUpdate(item.matchedWith, { isResolved: true });
             }
 
             res.json({ message: "Post marked as resolved successfully." });
         } else {
-            res.status(403).json({ error: "Unauthorized: Only the owner can resolve this post." });
+            res.status(403).json({ error: "Unauthorized: Only owner can resolve this post." });
         }
     } catch (err) {
         res.status(500).json({ error: "Failed to resolve post" });
