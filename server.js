@@ -30,7 +30,7 @@ const transporter = nodemailer.createTransport({
     family: 4, // Forces IPv4 to fix Render connection timeouts (ENETUNREACH)
     auth: {
         user: process.env.EMAIL_USER || 'cepcampuscare.test@gmail.com',
-        pass: process.env.EMAIL_PASS || 'oylm jolo vjmq yenc'
+        pass: process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/\s+/g, '') : 'oylmjolovjmqyenc'
     },
     tls: {
         rejectUnauthorized: false
@@ -65,8 +65,8 @@ async function sendMatchEmail(toEmail, userPost, matchedPost) {
     };
 
     try {
-        await transporter.sendMail(mailOptions);
-        console.log(`📧 Notification Email sent successfully to ${toEmail}`);
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`📧 Notification Email sent successfully to ${toEmail}:`, info.response);
     } catch (error) {
         console.error("❌ Email Sending Error:", error);
     }
@@ -169,9 +169,9 @@ app.get('/api/items/:id/matches', async (req, res) => {
             currentItem.matchedWith = matchedPost._id;
             await currentItem.save();
 
-            // Send notification emails to both users
-            sendMatchEmail(currentItem.email, currentItem, matchedPost);
-            sendMatchEmail(matchedPost.email, matchedPost, currentItem);
+            // Send notification emails to both users sequentially with await
+            await sendMatchEmail(currentItem.email, currentItem, matchedPost);
+            await sendMatchEmail(matchedPost.email, matchedPost, currentItem);
         }
 
         res.json({
