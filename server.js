@@ -22,12 +22,12 @@ mongoose.connect(MONGO_URI)
     .then(() => console.log('✅ Connected to CEP MongoDB Database successfully!'))
     .catch((err) => console.error('❌ MongoDB Connection Error:', err));
 
-// ================= NODEMAILER EMAIL TRANSPORTER =================
+// NODEMAILER EMAIL TRANSPORTER
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    family: 4, // Forces IPv4 to fix Render connection timeouts
+    port: 587,
+    secure: false, // Port 587-ന് നിർബന്ധമായും false ആയിരിക്കണം
+    family: 4,     // IPv4 മാത്രം ഉപയോഗിച്ച് Render Timeout തടയാൻ
     auth: {
         user: process.env.EMAIL_USER || 'cepcampuscare.test@gmail.com',
         pass: process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/\s+/g, '') : 'oylmjolovjmqyenc'
