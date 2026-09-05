@@ -39,6 +39,8 @@ const transporter = nodemailer.createTransport({
 
 // Helper to send email notification
 async function sendMatchEmail(toEmail, userPost, matchedPost) {
+    if (!toEmail) return;
+    
     const mailOptions = {
         from: `"CEPians Campus Care" <${process.env.EMAIL_USER || 'cepcampuscare.test@gmail.com'}>`,
         to: toEmail,
@@ -70,6 +72,53 @@ async function sendMatchEmail(toEmail, userPost, matchedPost) {
     } catch (error) {
         console.error("❌ Email Sending Error:", error);
     }
+}
+
+// Smart Auto-Matching Engine Logic
+async function findAndNotifyMatches(newItem) {
+    try {
+        const targetType = newItem.type === 'Lost' ? 'Found' : (newItem.type === 'Found' ? 'Lost' : null);
+        if (!targetType) return null;
+
+        // Extract key search terms (filtering out small words)
+        const searchWords = newItem.title
+            .trim()
+            .split(/\s+/)
+            .filter(word => word.length > 2);
+
+        if (searchWords.length === 0) return null;
+
+        const regexPattern = searchWords.join('|');
+
+        const matches = await Item.find({
+            _id: { $ne: newItem._id },
+            isResolved: { $ne: true },
+            type: targetType,
+            title: { $regex: regexPattern, $options: 'i' }
+        }).sort({ createdAt: -1 }).limit(3);
+
+        if (matches.length > 0) {
+            const matchedPost = matches[0];
+
+            // Link items in database
+            newItem.matchedWith = matchedPost._id;
+            await newItem.save();
+
+            matchedPost.matchedWith = newItem._id;
+            await matchedPost.save();
+
+            console.log(`✨ Match found between "${newItem.title}" and "${matchedPost.title}"`);
+
+            // Trigger notification emails
+            await sendMatchEmail(newItem.email, newItem, matchedPost);
+            await sendMatchEmail(matchedPost.email, matchedPost, newItem);
+            
+            return matchedPost;
+        }
+    } catch (err) {
+        console.error("❌ Auto Match Logic Error:", err);
+    }
+    return null;
 }
 
 // Helper Badge logic
@@ -126,7 +175,7 @@ app.get('/api/items', async (req, res) => {
     }
 });
 
-// 2. Post a new item/request
+// 2. Post a new item/request (NOW AUTOMATICALLY CHECKS MATCHES & SENDS EMAILS)
 app.post('/api/items', async (req, res) => {
     try {
         const itemData = req.body;
@@ -137,46 +186,31 @@ app.post('/api/items', async (req, res) => {
         const newItem = new Item(itemData);
         await newItem.save();
 
-        res.status(201).json({ item: newItem, earnedKarma: 0 });
+        // Run matching immediately in background
+        const matchedItem = await findAndNotifyMatches(newItem);
+
+        res.status(201).json({ 
+            item: newItem, 
+            matchedWith: matchedItem,
+            earnedKarma: 0 
+        });
     } catch (err) {
         console.error("Error creating item:", err);
         res.status(500).json({ error: "Failed to save post." });
     }
 });
 
-// 3. AUTO MATCH ROUTE (SMART KEYWORD MATCHING)
+// 3. MANUAL AUTO MATCH ROUTE (FOR RETRYING MATCHES)
 app.get('/api/items/:id/matches', async (req, res) => {
     try {
         const currentItem = await Item.findById(req.params.id);
         if (!currentItem) return res.status(404).json({ error: "Item not found" });
 
-        const targetType = currentItem.type === 'Lost' ? 'Found' : (currentItem.type === 'Found' ? 'Lost' : currentItem.type);
-
-        // Extract first word (e.g. "Casio" from "Casio Calculator")
-        const firstWord = currentItem.title.trim().split(/\s+/)[0];
-
-        const matches = await Item.find({
-            _id: { $ne: currentItem._id },
-            isResolved: { $ne: true },
-            type: targetType,
-            title: { $regex: firstWord, $options: 'i' }
-        }).limit(3);
-
-        if (matches.length > 0) {
-            const matchedPost = matches[0];
-
-            // Link items together
-            currentItem.matchedWith = matchedPost._id;
-            await currentItem.save();
-
-            // Send notification emails to both users sequentially with await
-            await sendMatchEmail(currentItem.email, currentItem, matchedPost);
-            await sendMatchEmail(matchedPost.email, matchedPost, currentItem);
-        }
+        const matchedPost = await findAndNotifyMatches(currentItem);
 
         res.json({
-            matchesCount: matches.length,
-            matches: matches
+            matchesCount: matchedPost ? 1 : 0,
+            matches: matchedPost ? [matchedPost] : []
         });
     } catch (err) {
         console.error("Auto match error:", err);
