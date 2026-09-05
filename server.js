@@ -24,10 +24,16 @@ mongoose.connect(MONGO_URI)
 
 // ================= NODEMAILER EMAIL TRANSPORTER =================
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    family: 4, // Forces IPv4 to fix Render connection timeouts (ENETUNREACH)
     auth: {
         user: process.env.EMAIL_USER || 'cepcampuscare.test@gmail.com',
         pass: process.env.EMAIL_PASS || 'oylm jolo vjmq yenc'
+    },
+    tls: {
+        rejectUnauthorized: false
     }
 });
 
